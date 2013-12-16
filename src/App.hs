@@ -13,7 +13,6 @@ main = scotty 3000 $ do
     json [(0::Int) .. 10]
 
   post "/notify" $ do
-    status status200
     json ("notified" :: String)
   
   notFound $ do 
