@@ -16,7 +16,7 @@ version:             0.1.0.0
 synopsis:            A daemon that guards your Github repositories
 
 -- A longer description of the package.
--- description:         
+description:         prs let's you subscribe to Github repos' webhooks and let's you act upon those events
 
 -- The license under which the package is released.
 license:             Apache-2.0
