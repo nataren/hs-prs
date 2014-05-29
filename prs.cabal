@@ -55,6 +55,8 @@ library
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
+
+  ghc-options: -02 -Wall -fwarn-tabs 
   
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.6 && <4.7
