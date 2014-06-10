@@ -2,9 +2,12 @@
 
 import Web.Scotty
 import qualified Data.Text as T
-import qualified Data.Aeson.Types as Json
+import qualified Network.HTTP.Types as H
 
 main :: IO ()
 main = scotty 3000 $ do
-  get (literal "/status") $ do
-    (json . Json.String . T.pack) "Working fine ..."
+  get "/status" $ do
+    (json . T.pack) "Working fine ..."
+
+  post "/notify" $ do
+    status H.notImplemented501

@@ -63,7 +63,8 @@ executable hs-prs
   build-depends:       base >=4.6 && <4.7,
                        scotty >= 0.7.3,
                        aeson > 0.7.0.5,
-                       text
+                       text,
+                       http-types >= 0.8.5
   
   -- Directories containing source files.
   hs-source-dirs:        src
