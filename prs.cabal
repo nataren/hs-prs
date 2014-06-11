@@ -64,7 +64,8 @@ executable hs-prs
                        scotty >= 0.7.3,
                        aeson > 0.7.0.5,
                        text,
-                       http-types >= 0.8.5
+                       http-types >= 0.8.5,
+                       github >=  0.8
   
   -- Directories containing source files.
   hs-source-dirs:        src
