@@ -65,7 +65,7 @@ executable hs-prs
                        aeson > 0.7.0.5,
                        text,
                        http-types >= 0.8.5,
-                       github >=  0.8
+                       github >=  0.9
   
   -- Directories containing source files.
   hs-source-dirs:        src
