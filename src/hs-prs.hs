@@ -1,14 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Web.Scotty
+import qualified Web.Scotty as S
 import qualified Data.Text as T
-import qualified Network.HTTP.Types as H
-
+import Data.Aeson
+import Github.Data
 
 main :: IO ()
-main = scotty 3000 $ do
-  get "/status" $ do
-    (json . T.pack) "Working fine ..."
+main = S.scotty 3000 $ do
+  S.get "/status" $ do
+    S.json . T.pack $ "Working fine ..."
 
-  post "/notify" $ do
-    status H.notImplemented501
+  S.post "/pr/notify" $ do
+    b <- S.body
+    let event = decode b :: Maybe PullRequestEvent
+    case event of
+      Just ev -> S.json $ show . pullRequestEventAction $ ev
+      Nothing -> S.json . T.pack $ ""
