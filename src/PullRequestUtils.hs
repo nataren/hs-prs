@@ -21,13 +21,25 @@ pullRequestIsMerged = detailedPullRequestMerged
 
 pullRequestMergeabilityIsUnknown :: DetailedPullRequest -> Bool
 pullRequestMergeabilityIsUnknown pr = case detailedPullRequestMergeable pr of
-  Just mergeable -> mergeable
-  Nothing -> false
+  Just mergeable -> false
+  Nothing -> true
+
+pullRequestIsMergeable :: DetailedPullRequest -> Bool
+pullRequestIsMergeable pr =
+  case detailedPullRequestMergeable pr of
+    Just mergeable -> mergeable
+    Nothing -> false
+
+pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool
+pullRequestIsAutoMergeable pr =
+  not . detailedPullRequestMerged $ pr & pullRequestIsMergeable pr & detailedPullRequestState pr == "clean"
 
 getPullRequestType :: DetailedPullRequest -> MindTouchPullRequestType
 getPullRequestType pr =
   pullRequestTargetsMasterBranch pr = TargetsMasterBranch
   pullRequestIsMerged pr = Merged
+  pullRequestMergeabilityIsUnknown pr = UnknownMergeability
+  pullRequestIsAutoMergeable pr = AutoMergeable
 
 getPullRequestTypeFromEvent :: PullRequestEvent -> Maybe MindTouchPullRequestType
 getPullRequestTypeFromEvent ev =
