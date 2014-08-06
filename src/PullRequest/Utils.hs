@@ -19,7 +19,7 @@ pullRequestIsMerged = detailedPullRequestMerged
 
 pullRequestMergeabilityIsUnknown :: DetailedPullRequest -> Bool
 pullRequestMergeabilityIsUnknown pr = case detailedPullRequestMergeable pr of
-  Just mergeable -> False
+  Just _ -> False
   Nothing -> True
 
 pullRequestIsMergeable :: DetailedPullRequest -> Bool
