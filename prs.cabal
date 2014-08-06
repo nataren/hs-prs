@@ -52,7 +52,7 @@ executable hs-prs
   -- exposed-modules:     
   
   -- Modules included in this library but not exported.
-  -- other-modules:       
+  other-modules: PullRequest.Utils
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
