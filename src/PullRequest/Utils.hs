@@ -46,8 +46,8 @@ getPullRequestTypeFromEvent ev =
     PullRequestClosed -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
     PullRequestReopened -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
     PullRequestSynchronized -> Nothing
-    PullRequestMerged -> Nothing
-    PullRequestLabeled -> Nothing
-    PullRequestUnlabeled -> Nothing
-    PullRequestAssigned -> Nothing
-    PullRequestUnassigned -> Nothing
+--    PullRequestMerged -> Nothing
+--    PullRequestLabeled -> Nothing
+--    PullRequestUnlabeled -> Nothing
+--    PullRequestAssigned -> Nothing
+--    PullRequestUnassigned -> Nothing
