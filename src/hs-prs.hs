@@ -5,21 +5,18 @@ import qualified Web.Scotty as S
 import qualified Data.Text as T
 import Data.Aeson
 import Github.Data
+import Github.Auth
 import PullRequest.Utils
 import Control.Monad
 import System.Environment
 
-getEnvironmentVariable :: String -> IO String
-getEnvironmentVariable var = liftM read $ getEnv var
-
 main :: IO ()
 main = do
-
   -- Read all the web services configuration values
-  githubToken <- getEnvironmentVariable "GITHUB_TOKEN"
-  githubOwner <- getEnvironmentVariable "GITHUB_OWNER"
-  githubRepos <- getEnvironmentVariable "GITHUB_REPOS"
-  publicUri <- getEnvironmentVariable "PRS_PUBLIC_URI"
+  githubToken <- getEnv "GITHUB_TOKEN"
+  githubOwner <- getEnv "GITHUB_OWNER"
+  githubRepos <- getEnv "GITHUB_REPOS"
+  publicUri <- getEnv "PRS_PUBLIC_URI"
   -- mergeRetries <- getEnvironmentVariable "MERGE_RETRIES"
   -- mergeTTL <- getEnvironmentVariable "MERGE_TTL"
   -- mergeabilityRetries <- getEnvironmentVariable "MERGEABILITY_RETRIES"
@@ -31,7 +28,8 @@ main = do
   -- archiveBranchesTTL <- getEnvironmentVariable "ARCHIVE_BRANCHES_TTL"
   -- archiveBranchesToKeep <- getEnvironmentVariable "ARCHIVE_BRANCHES_TO_KEEP"
   let repos = T.splitOn "," (T.pack githubRepos)
-  
+  let auth = GithubOAuth githubToken
+  _ <- createWebhooks auth githubOwner repos (T.pack publicUri)
   S.scotty 3000 $ do
     S.middleware logStdoutDev
   
