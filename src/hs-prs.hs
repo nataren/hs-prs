@@ -13,20 +13,20 @@ import System.Environment
 main :: IO ()
 main = do
   -- Read all the web services configuration values
-  githubToken <- getEnv "GITHUB_TOKEN"
-  githubOwner <- getEnv "GITHUB_OWNER"
-  githubRepos <- getEnv "GITHUB_REPOS"
+  githubToken <- getEnv "PRS_GITHUB_TOKEN"
+  githubOwner <- getEnv "PRS_GITHUB_OWNER"
+  githubRepos <- getEnv "PRS_GITHUB_REPOS"
   publicUri <- getEnv "PRS_PUBLIC_URI"
-  -- mergeRetries <- getEnvironmentVariable "MERGE_RETRIES"
-  -- mergeTTL <- getEnvironmentVariable "MERGE_TTL"
-  -- mergeabilityRetries <- getEnvironmentVariable "MERGEABILITY_RETRIES"
-  -- mergeabilityTTL <- getEnvironmentVariable "MERGEABILITY_TTL"
-  -- github2youtrack <- getEnvironmentVariable "GITHUB_2_YOUTRACK"
-  -- youtrackHostname <- getEnvironmentVariable "YOUTRACK_HOSTNAME"
-  -- youtrackUsername <- getEnvironmentVariable "YOUTRACK_USERNAME"
-  -- youtrackPassword <- getEnvironmentVariable "YOUTRACK_PASSWORD"
-  -- archiveBranchesTTL <- getEnvironmentVariable "ARCHIVE_BRANCHES_TTL"
-  -- archiveBranchesToKeep <- getEnvironmentVariable "ARCHIVE_BRANCHES_TO_KEEP"
+  mergeRetries <- getEnv "PRS_MERGE_RETRIES"
+  mergeTTL <- getEnv "PRS_MERGE_TTL"
+  mergeabilityRetries <- getEnv "PRS_MERGEABILITY_RETRIES"
+  mergeabilityTTL <- getEnv "PRS_MERGEABILITY_TTL"
+  github2youtrack <- getEnv "PRS_GITHUB_2_YOUTRACK"
+  youtrackHostname <- getEnv "PRS_YOUTRACK_HOSTNAME"
+  youtrackUsername <- getEnv "PRS_YOUTRACK_USERNAME"
+  youtrackPassword <- getEnv "PRS_YOUTRACK_PASSWORD"
+  archiveBranchesTTL <- getEnv "PRS_ARCHIVE_BRANCHES_TTL"
+  archiveBranchesToKeep <- getEnv "PRS_ARCHIVE_BRANCHES_TO_KEEP"
   let repos = T.splitOn "," (T.pack githubRepos)
   let auth = GithubOAuth githubToken
   _ <- createWebhooks auth githubOwner repos (T.pack publicUri)
