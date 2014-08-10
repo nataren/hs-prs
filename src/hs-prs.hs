@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+-- | The entry point to the 'PullRequestService' web service
+module PullRequestService where
 
 import Network.Wai.Middleware.RequestLogger
 import qualified Web.Scotty as S
