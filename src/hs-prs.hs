@@ -14,6 +14,8 @@ getEnvironmentVariable var = liftM read $ getEnv var
 
 main :: IO ()
 main = do
+
+  -- Read all the web services configuration values
   githubToken <- getEnvironmentVariable "GITHUB_TOKEN"
   githubOwner <- getEnvironmentVariable "GITHUB_OWNER"
   githubRepos <- getEnvironmentVariable "GITHUB_REPOS"
@@ -28,6 +30,7 @@ main = do
   -- youtrackPassword <- getEnvironmentVariable "YOUTRACK_PASSWORD"
   -- archiveBranchesTTL <- getEnvironmentVariable "ARCHIVE_BRANCHES_TTL"
   -- archiveBranchesToKeep <- getEnvironmentVariable "ARCHIVE_BRANCHES_TO_KEEP"
+  let repos = T.splitOn "," (T.pack githubRepos)
   
   S.scotty 3000 $ do
     S.middleware logStdoutDev

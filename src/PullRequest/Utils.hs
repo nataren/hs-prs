@@ -1,6 +1,12 @@
 module PullRequest.Utils where
 
 import Github.Data
+import Github.Repos.Webhooks
+import Github.Auth
+import qualified Data.Text as T
+import Data.Functor
+import Control.Monad
+import qualified Data.Map as M
 
 data MindTouchPullRequestType =
     PullRequestTargetsMasterBranch
@@ -51,3 +57,23 @@ getPullRequestTypeFromEvent ev =
 --    PullRequestUnlabeled -> Nothing
 --    PullRequestAssigned -> Nothing
 --    PullRequestUnassigned -> Nothing
+
+-- Webhooks creation
+createWebhooks :: GithubAuth -> RepoOwner -> [T.Text] -> T.Text -> [IO (Either Error RepoWebhook)]
+createWebhooks auth repoOwner' repos publicUri = do
+  mapM (\repo -> createRepoWebhook' auth repoOwner' repo brandNewRepoHook)
+    (filterM (\repo -> not . snd <$> webhookExists auth repoOwner' repo publicUri) repos)
+    where
+      brandNewRepoHook = NewRepoWebhook {
+        newRepoWebhookName = "web"
+       ,newRepoWebhookConfig = M.fromList [("url", T.unpack publicUri), ("content_type", "json") ]
+       ,newRepoWebhookEvents = Just ["pull_request"]
+       ,newRepoWebhookActive = Just True
+                                        }
+  
+webhookExists :: GithubAuth -> RepoOwner -> T.Text -> T.Text -> IO (T.Text, Bool)
+webhookExists auth repoOwner' repoName' publicUri = do
+  possibleWebhooks <- webhooksFor' auth repoOwner' (T.unpack repoName')
+  case possibleWebhooks of
+    (Left _) -> return (repoName', False)
+    (Right webhooks) -> return $ (repoName', (any (\wh -> publicUri == T.pack (repoWebhookUrl wh)) webhooks))
