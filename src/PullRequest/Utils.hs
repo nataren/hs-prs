@@ -3,20 +3,25 @@ module PullRequest.Utils where
 import Github.Data
 import Github.Repos.Webhooks
 import Github.Auth
-import qualified Data.Text as T
+import Github.PullRequests
+import Github.Issues.Comments
 import Data.Functor
 import Control.Monad
+import Data.Either
 import qualified Data.Map as M
+import qualified Data.Text as T
+import qualified Data.List as L
+import qualified Data.Function as F
 
 -- | The 'MindTouchPullRequestType' represents the different ways we
 -- classify a pull request
 data MindTouchPullRequestType =
-    PullRequestTargetsMasterBranch
-  | PullRequestReopenedNotLinkedToYouTrackTicket
-  | PullRequestOpenedNotLinkedToYouTrackIssue
-  | PullRequestMerged
-  | PullRequestUnknownMergeability
-  | PullRequestAutoMergeable
+    PullRequestTargetsMasterBranch DetailedPullRequest
+  | PullRequestReopenedNotLinkedToYouTrackTicket DetailedPullRequest
+  | PullRequestOpenedNotLinkedToYouTrackIssue DetailedPullRequest
+  | PullRequestMerged DetailedPullRequest
+  | PullRequestUnknownMergeability DetailedPullRequest
+  | PullRequestAutoMergeable DetailedPullRequest
   deriving Show
 
 -- | Determine if a pull request is targetting the master branch
@@ -48,16 +53,16 @@ pullRequestIsAutoMergeable pr =
 
 getPullRequestType :: DetailedPullRequest -> MindTouchPullRequestType
 getPullRequestType pr
-  | pullRequestTargetsMasterBranch pr = PullRequestTargetsMasterBranch
-  | pullRequestIsMerged pr = PullRequestMerged
-  | pullRequestMergeabilityIsUnknown pr = PullRequestUnknownMergeability
-  | pullRequestIsAutoMergeable pr = PullRequestAutoMergeable
+  | pullRequestTargetsMasterBranch pr = PullRequestTargetsMasterBranch pr
+  | pullRequestIsMerged pr = PullRequestMerged pr
+  | pullRequestMergeabilityIsUnknown pr = PullRequestUnknownMergeability pr
+  | pullRequestIsAutoMergeable pr = PullRequestAutoMergeable pr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
 getPullRequestTypeFromEvent :: PullRequestEvent -> Maybe MindTouchPullRequestType
 getPullRequestTypeFromEvent ev =
   case pullRequestEventAction ev of
-    PullRequestOpened -> Just .getPullRequestType . pullRequestEventPullRequest $ ev
+    PullRequestOpened -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
     PullRequestClosed -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
     PullRequestReopened -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
     PullRequestSynchronized -> Nothing
@@ -66,6 +71,15 @@ getPullRequestTypeFromEvent ev =
 --    PullRequestUnlabeled -> Nothing
 --    PullRequestAssigned -> Nothing
 --    PullRequestUnassigned -> Nothing
+
+processPullRequestType :: GithubAuth -> MindTouchPullRequestType -> IO (Either Error Comment)
+processPullRequestType auth prType = case prType of
+  PullRequestTargetsMasterBranch dpr -> commentOnPullRequest auth dpr (T.pack "This pull request is invalid because it targets the master branch")
+  PullRequestReopenedNotLinkedToYouTrackTicket dpr -> undefined
+  PullRequestOpenedNotLinkedToYouTrackIssue dpr -> undefined
+  PullRequestMerged dpr -> undefined
+  PullRequestUnknownMergeability dpr -> undefined
+  PullRequestAutoMergeable dpr -> undefined
 
 -- | How to 'createWebhooks'
 createWebhooks :: GithubAuth -> RepoOwner -> [T.Text] -> T.Text -> IO [(Either Error RepoWebhook)]
@@ -87,3 +101,37 @@ webhookExists auth repoOwner' repoName' publicUri = do
   case possibleWebhooks of
     (Left _) -> return (repoName', False)
     (Right webhooks) -> return $ (repoName', (any (\wh -> publicUri == T.pack (repoWebhookUrl wh)) webhooks))
+
+-- | Leave a comment on a pull request
+commentOnPullRequest :: GithubAuth -> DetailedPullRequest -> T.Text -> IO (Either Error Comment)
+commentOnPullRequest auth dpr commentBody' = createComment auth user' repo' issue' (T.unpack commentBody')
+  where user' = getOwner dpr
+        repo' = getRepoName dpr
+        issue' = getIssueNumber dpr
+
+getOwner :: DetailedPullRequest -> String
+getOwner dpr = case (repoOwner . pullRequestCommitRepo . detailedPullRequestHead) dpr of
+                    GithubUser _ userOwnerLoging _ _ _ -> userOwnerLoging
+                    GithubOrganization _ orgOwnerLoging _ _ -> orgOwnerLoging
+
+getRepoName :: DetailedPullRequest -> String
+getRepoName = repoName . pullRequestCommitRepo . detailedPullRequestHead
+
+getPullRequestRepoName :: PullRequest -> String
+getPullRequestRepoName = githubOwnerLogin . pullRequestUser
+
+getIssueNumber :: DetailedPullRequest -> Int
+getIssueNumber dpr = (read . T.unpack $ parts L.!! (L.length parts - 1) :: Int)
+  where parts = T.splitOn (T.pack "/") (T.pack $ detailedPullRequestIssueUrl dpr)
+
+-- | Fetches the open pull requests from a repo and perform the
+-- adecuate action on it
+processRepos :: GithubAuth -> RepoOwner -> [T.Text] ->  IO [Either Error Comment]
+processRepos auth repoOwner' repos' = do
+  pullRequests <- sequence $ map (\repo -> pullRequestsFor' (Just auth) repoOwner' (T.unpack repo)) repos'
+  let openPullRequests = filter (\pr -> pullRequestState pr == "open") (concat $ rights pullRequests)
+  openPullRequestsDetails <- sequence $ map (\pr -> pullRequest' (Just auth) repoOwner' (getPullRequestRepoName pr) (pullRequestId pr)) openPullRequests
+  let orderedOpenPullRequestsDetails = L.sortBy (compare `F.on` (\pr -> detailedPullRequestCreatedAt pr)) (rights openPullRequestsDetails)
+  let typedPullRequests = map (\pr -> getPullRequestType pr) orderedOpenPullRequestsDetails
+  results <- sequence $ map (\pr -> processPullRequestType auth pr) typedPullRequests
+  return results

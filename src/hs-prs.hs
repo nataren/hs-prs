@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | The entry point to the 'PullRequestService' web service
-module PullRequestService where
+module Main where
 
 import Network.Wai.Middleware.RequestLogger
 import qualified Web.Scotty as S
@@ -9,7 +9,6 @@ import Data.Aeson
 import Github.Data
 import Github.Auth
 import PullRequest.Utils
-import Control.Monad
 import System.Environment
 
 main :: IO ()
@@ -41,6 +40,14 @@ main = do
     S.post "/pr/notify" $ do
       b <- S.body
       let event = decode b :: Maybe PullRequestEvent
-      case event of
-        Just ev -> S.json $ show . getPullRequestTypeFromEvent $ ev
+          auth = GithubOAuth githubToken   
+        in case event of
+        Just prEvent -> do
+          case getPullRequestTypeFromEvent prEvent of
+            Nothing -> S.json . T.pack $ "Not able to figure out the pull request type"
+            Just prType -> do
+              res <- processPullRequestType auth prType
+              case res of
+                Left err -> S.json . T.pack $ "An error happened"
+                Right comm -> S.json . T.pack $ commentBody comm
         Nothing -> S.json . T.pack $ ""
