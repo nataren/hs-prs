@@ -41,7 +41,6 @@ main = do
     S.post "/pr/notify" $ do
       b <- S.body
       let event = decode b :: Maybe PullRequestEvent
-      let auth = GithubOAuth githubToken   
       case event of
         Just prEvent -> do
           case getPullRequestTypeFromEvent prEvent of
