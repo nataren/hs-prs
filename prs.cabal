@@ -67,7 +67,8 @@ executable hs-prs
                        http-types >= 0.8.5,
                        github >=  0.9,
                        wai-extra >= 0.4.6,
-                       containers >= 0.4
+                       containers >= 0.4,
+                       transformers > 0.3
   
   -- Directories containing source files.
   hs-source-dirs:        src

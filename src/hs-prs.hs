@@ -10,6 +10,7 @@ import Github.Data
 import Github.Auth
 import PullRequest.Utils
 import System.Environment
+import Control.Monad.IO.Class (liftIO)
 
 main :: IO ()
 main = do
@@ -40,14 +41,18 @@ main = do
     S.post "/pr/notify" $ do
       b <- S.body
       let event = decode b :: Maybe PullRequestEvent
-          auth = GithubOAuth githubToken   
-        in case event of
+      let auth = GithubOAuth githubToken   
+      case event of
         Just prEvent -> do
           case getPullRequestTypeFromEvent prEvent of
             Nothing -> S.json . T.pack $ "Not able to figure out the pull request type"
             Just prType -> do
-              res <- processPullRequestType auth prType
+              res <- liftIO $ processPullRequestType auth prType
               case res of
-                Left err -> S.json . T.pack $ "An error happened"
+                Left err -> S.json . T.pack $ (case err of
+                                                  HTTPConnectionError e -> "Connection error: " ++ (show e)
+                                                  ParseError e -> "ParseError: " ++ e
+                                                  JsonError e -> "JsonError: " ++ e
+                                                  UserError e -> "UserError: " ++ e)
                 Right comm -> S.json . T.pack $ commentBody comm
         Nothing -> S.json . T.pack $ ""
