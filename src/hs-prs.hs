@@ -53,5 +53,5 @@ main = do
                                                   ParseError e -> "ParseError: " ++ e
                                                   JsonError e -> "JsonError: " ++ e
                                                   UserError e -> "UserError: " ++ e)
-                Right comm -> S.json . T.pack $ commentBody comm
+                Right dpr -> S.json . T.pack . show $ detailedPullRequestNumber dpr
         Nothing -> S.json . T.pack $ ""

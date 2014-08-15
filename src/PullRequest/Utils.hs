@@ -72,9 +72,12 @@ getPullRequestTypeFromEvent ev =
 --    PullRequestAssigned -> Nothing
 --    PullRequestUnassigned -> Nothing
 
-processPullRequestType :: GithubAuth -> MindTouchPullRequestType -> IO (Either Error Comment)
+processPullRequestType :: GithubAuth -> MindTouchPullRequestType -> IO (Either Error DetailedPullRequest)
 processPullRequestType auth prType = case prType of
-  PullRequestTargetsMasterBranch dpr -> commentOnPullRequest auth dpr (T.pack "This pull request is invalid because it targets the master branch")
+  PullRequestTargetsMasterBranch dpr -> do
+    _ <- commentOnPullRequest auth dpr (T.pack "This pull request is invalid because it targets the master branch")
+    closeRes <- closePullRequest auth dpr
+    return closeRes
   PullRequestReopenedNotLinkedToYouTrackTicket dpr -> undefined
   PullRequestOpenedNotLinkedToYouTrackIssue dpr -> undefined
   PullRequestMerged dpr -> undefined
@@ -90,17 +93,25 @@ createWebhooks auth repoOwner' repos publicUri = do
       brandNewRepoHook = NewRepoWebhook {
         newRepoWebhookName = "web"
        ,newRepoWebhookConfig = M.fromList [("url", T.unpack publicUri), ("content_type", "json") ]
-       ,newRepoWebhookEvents = Just ["pull_request"]
+       ,newRepoWebhookEvents = Just [WebhookPullRequestEvent]
        ,newRepoWebhookActive = Just True
      }
 
--- | Check is a webhook with a given URI exists on a repo  
+-- | Check is a webhook with a given URI exists on a repo
 webhookExists :: GithubAuth -> RepoOwner -> T.Text -> T.Text -> IO (T.Text, Bool)
 webhookExists auth repoOwner' repoName' publicUri = do
   possibleWebhooks <- webhooksFor' auth repoOwner' (T.unpack repoName')
   case possibleWebhooks of
     (Left _) -> return (repoName', False)
     (Right webhooks) -> return $ (repoName', (any (\wh -> publicUri == T.pack (repoWebhookUrl wh)) webhooks))
+
+-- | Close a pull request
+closePullRequest :: GithubAuth -> DetailedPullRequest -> IO (Either Error DetailedPullRequest)
+closePullRequest auth dpr =
+  updatePullRequest auth repoOwner' repoName' prNumber EditPullRequest { editPullRequestTitle = Nothing, editPullRequestBody = Nothing, editPullRequestState = Just EditPullRequestStateClosed }
+  where repoOwner' = getOwner dpr
+        repoName' = getRepoName dpr
+        prNumber = detailedPullRequestNumber dpr
 
 -- | Leave a comment on a pull request
 commentOnPullRequest :: GithubAuth -> DetailedPullRequest -> T.Text -> IO (Either Error Comment)
@@ -109,24 +120,28 @@ commentOnPullRequest auth dpr commentBody' = createComment auth user' repo' issu
         repo' = getRepoName dpr
         issue' = getIssueNumber dpr
 
+-- | Given the details of a pull request extract its repository owner
 getOwner :: DetailedPullRequest -> String
 getOwner dpr = case (repoOwner . pullRequestCommitRepo . detailedPullRequestHead) dpr of
                     GithubUser _ userOwnerLoging _ _ _ -> userOwnerLoging
                     GithubOrganization _ orgOwnerLoging _ _ -> orgOwnerLoging
 
+-- | Given the details of a pull request extract ist repository name
 getRepoName :: DetailedPullRequest -> String
 getRepoName = repoName . pullRequestCommitRepo . detailedPullRequestHead
 
+-- | Given a pull request extract its repository name
 getPullRequestRepoName :: PullRequest -> String
 getPullRequestRepoName = githubOwnerLogin . pullRequestUser
 
+-- | Given the details of a pull request extract its issue number
 getIssueNumber :: DetailedPullRequest -> Int
 getIssueNumber dpr = (read . T.unpack $ parts L.!! (L.length parts - 1) :: Int)
   where parts = T.splitOn (T.pack "/") (T.pack $ detailedPullRequestIssueUrl dpr)
 
 -- | Fetches the open pull requests from a repo and perform the
 -- adecuate action on it
-processRepos :: GithubAuth -> RepoOwner -> [T.Text] ->  IO [Either Error Comment]
+processRepos :: GithubAuth -> RepoOwner -> [T.Text] ->  IO [Either Error DetailedPullRequest]
 processRepos auth repoOwner' repos' = do
   pullRequests <- sequence $ map (\repo -> pullRequestsFor' (Just auth) repoOwner' (T.unpack repo)) repos'
   let openPullRequests = filter (\pr -> pullRequestState pr == "open") (concat $ rights pullRequests)
