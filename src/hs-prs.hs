@@ -11,6 +11,7 @@ import Github.Auth
 import PullRequest.Utils
 import System.Environment
 import Control.Monad.IO.Class (liftIO)
+import Safe
 
 main :: IO ()
 main = do

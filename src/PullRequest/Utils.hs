@@ -5,9 +5,12 @@ import Github.Repos.Webhooks
 import Github.Auth
 import Github.PullRequests
 import Github.Issues.Comments
+import Github.Issues.Events
 import Data.Functor
 import Control.Monad
+import Control.Applicative
 import Data.Either
+import Safe
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.List as L
@@ -51,12 +54,33 @@ pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool
 pullRequestIsAutoMergeable pr =
   ((not . detailedPullRequestMerged) $ pr) && (pullRequestIsMergeable pr) && (detailedPullRequestState pr) == "clean"
 
+pullRequestIsOpen :: DetailedPullRequest -> Bool
+pullRequestIsOpen dpr = state == "open" || state == "reopen"
+  where state = detailedPullRequestState dpr
+
+pullRequestIsReopened :: DetailedPullRequest -> IO Bool
+pullRequestIsReopened dpr = do
+  events <- eventsForIssue owner' repo' issueNumber'
+  case events of
+    Left err -> return False
+    Right events' -> do
+      let lastEvent = lastMay events'
+      case lastEvent of
+        Just lastEvent' -> return $ eventType lastEvent' == Reopened
+        Nothing -> return False
+  where
+    repo' = getRepoName dpr
+    owner' = getOwner dpr
+    issueNumber' = getIssueNumber dpr
+
 getPullRequestType :: DetailedPullRequest -> MindTouchPullRequestType
-getPullRequestType pr
-  | pullRequestTargetsMasterBranch pr = PullRequestTargetsMasterBranch pr
-  | pullRequestIsMerged pr = PullRequestMerged pr
-  | pullRequestMergeabilityIsUnknown pr = PullRequestUnknownMergeability pr
-  | pullRequestIsAutoMergeable pr = PullRequestAutoMergeable pr
+getPullRequestType dpr
+  |  pullRequestTargetsMasterBranch dpr = PullRequestTargetsMasterBranch dpr
+  | pullRequestIsOpen dpr && pullRequestIsReopened dpr = PullRequestReopenedNotLinkedToYouTrackTicket dpr
+--  | pullRequestIsOpen pr = PullRequestOpenedNotLinkedToYouTrackIssue pr
+  | pullRequestIsMerged dpr = PullRequestMerged dpr
+  | pullRequestMergeabilityIsUnknown dpr = PullRequestUnknownMergeability dpr
+  | pullRequestIsAutoMergeable dpr = PullRequestAutoMergeable dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
 getPullRequestTypeFromEvent :: PullRequestEvent -> Maybe MindTouchPullRequestType
@@ -144,7 +168,7 @@ getIssueNumber dpr = (read . T.unpack $ parts L.!! (L.length parts - 1) :: Int)
 processRepos :: GithubAuth -> RepoOwner -> [T.Text] ->  IO [Either Error DetailedPullRequest]
 processRepos auth repoOwner' repos' = do
   pullRequests <- sequence $ map (\repo -> pullRequestsFor' (Just auth) repoOwner' (T.unpack repo)) repos'
-  let openPullRequests = filter (\pr -> pullRequestState pr == "open") (concat $ rights pullRequests)
+  let openPullRequests = filter pullRequestIsOpen (concat $ rights pullRequests)
   openPullRequestsDetails <- sequence $ map (\pr -> pullRequest' (Just auth) repoOwner' (getPullRequestRepoName pr) (pullRequestId pr)) openPullRequests
   let orderedOpenPullRequestsDetails = L.sortBy (compare `F.on` (\pr -> detailedPullRequestCreatedAt pr)) (rights openPullRequestsDetails)
   let typedPullRequests = map (\pr -> getPullRequestType pr) orderedOpenPullRequestsDetails
