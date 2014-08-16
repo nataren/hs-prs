@@ -168,7 +168,7 @@ getIssueNumber dpr = (read . T.unpack $ parts L.!! (L.length parts - 1) :: Int)
 processRepos :: GithubAuth -> RepoOwner -> [T.Text] ->  IO [Either Error DetailedPullRequest]
 processRepos auth repoOwner' repos' = do
   pullRequests <- sequence $ map (\repo -> pullRequestsFor' (Just auth) repoOwner' (T.unpack repo)) repos'
-  let openPullRequests = filter pullRequestIsOpen (concat $ rights pullRequests)
+  let openPullRequests = filter (\pr -> pullRequestState pr == "open") (concat $ rights pullRequests)
   openPullRequestsDetails <- sequence $ map (\pr -> pullRequest' (Just auth) repoOwner' (getPullRequestRepoName pr) (pullRequestId pr)) openPullRequests
   let orderedOpenPullRequestsDetails = L.sortBy (compare `F.on` (\pr -> detailedPullRequestCreatedAt pr)) (rights openPullRequestsDetails)
   let typedPullRequests = map (\pr -> getPullRequestType pr) orderedOpenPullRequestsDetails
