@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Function as F
+import qualified Datetime.Utils as DT
 
 -- | The 'MindTouchPullRequestType' represents the different ways we
 -- classify a pull request
@@ -55,8 +56,8 @@ pullRequestIsMergeable pr =
 targetsOpenBranch :: DetailedPullRequest -> IO Bool
 targetsOpenBranch dpr = do
   now' <- now
-  return $ targetsOpenBranch ref now'
-    where ref = pullRequestCommitRef . detailedPullRequestBase $ dpr
+  return $ DT.targetsOpenBranch ref now'
+    where ref = T.pack . pullRequestCommitRef . detailedPullRequestBase $ dpr
     
 -- | Determine if the pull request is considered auto-mergeable by the bot
 pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool
