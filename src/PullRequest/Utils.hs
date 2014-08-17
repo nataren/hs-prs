@@ -8,7 +8,6 @@ import Github.Issues.Comments
 import Github.Issues.Events
 import Data.Functor
 import Control.Monad
-import Control.Applicative
 import Data.Either
 import Safe
 import qualified Data.Map as M
@@ -19,7 +18,8 @@ import qualified Data.Function as F
 -- | The 'MindTouchPullRequestType' represents the different ways we
 -- classify a pull request
 data MindTouchPullRequestType =
-    PullRequestTargetsMasterBranch DetailedPullRequest
+    PullRequestIsUncategorized DetailedPullRequest
+  | PullRequestTargetsMasterBranch DetailedPullRequest
   | PullRequestReopenedNotLinkedToYouTrackTicket DetailedPullRequest
   | PullRequestOpenedNotLinkedToYouTrackIssue DetailedPullRequest
   | PullRequestMerged DetailedPullRequest
@@ -73,28 +73,26 @@ pullRequestIsReopened dpr = do
     owner' = getOwner dpr
     issueNumber' = getIssueNumber dpr
 
-getPullRequestType :: DetailedPullRequest -> MindTouchPullRequestType
-getPullRequestType dpr
-  |  pullRequestTargetsMasterBranch dpr = PullRequestTargetsMasterBranch dpr
-  | pullRequestIsOpen dpr && pullRequestIsReopened dpr = PullRequestReopenedNotLinkedToYouTrackTicket dpr
---  | pullRequestIsOpen pr = PullRequestOpenedNotLinkedToYouTrackIssue pr
-  | pullRequestIsMerged dpr = PullRequestMerged dpr
-  | pullRequestMergeabilityIsUnknown dpr = PullRequestUnknownMergeability dpr
-  | pullRequestIsAutoMergeable dpr = PullRequestAutoMergeable dpr
+getPullRequestType :: DetailedPullRequest -> IO MindTouchPullRequestType
+getPullRequestType dpr = do
+  prTargetsMasterBranch <- return $ pullRequestTargetsMasterBranch dpr
+  if prTargetsMasterBranch
+    then return $ PullRequestTargetsMasterBranch dpr
+    else do
+    isReopened <- pullRequestIsReopened dpr
+    if isReopened && (pullRequestIsOpen dpr)
+      then return $ PullRequestReopenedNotLinkedToYouTrackTicket dpr
+      else return $ PullRequestIsUncategorized dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
-getPullRequestTypeFromEvent :: PullRequestEvent -> Maybe MindTouchPullRequestType
-getPullRequestTypeFromEvent ev =
-  case pullRequestEventAction ev of
-    PullRequestOpened -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
-    PullRequestClosed -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
-    PullRequestReopened -> Just . getPullRequestType . pullRequestEventPullRequest $ ev
-    PullRequestSynchronized -> Nothing
---    PullRequestMerged -> Nothing
---    PullRequestLabeled -> Nothing
---    PullRequestUnlabeled -> Nothing
---    PullRequestAssigned -> Nothing
---    PullRequestUnassigned -> Nothing
+getPullRequestTypeFromEvent :: PullRequestEvent -> IO MindTouchPullRequestType
+getPullRequestTypeFromEvent ev = do
+  eventType' <- return $ pullRequestEventAction ev 
+  type' <- getPullRequestType . pullRequestEventPullRequest $ ev
+  case eventType' of
+    PullRequestOpened -> return type'
+    PullRequestClosed -> return type'
+    PullRequestReopened -> return type'
 
 processPullRequestType :: GithubAuth -> MindTouchPullRequestType -> IO (Either Error DetailedPullRequest)
 processPullRequestType auth prType = case prType of
@@ -102,7 +100,9 @@ processPullRequestType auth prType = case prType of
     _ <- commentOnPullRequest auth dpr (T.pack "This pull request is invalid because it targets the master branch")
     closeRes <- closePullRequest auth dpr
     return closeRes
-  PullRequestReopenedNotLinkedToYouTrackTicket dpr -> undefined
+  PullRequestReopenedNotLinkedToYouTrackTicket dpr -> do
+    _ <- commentOnPullRequest auth dpr (T.pack "This *reopened* pull request is not bound to a YouTrack issue, it will be ignored but human intervention is required")
+    return $ Right dpr
   PullRequestOpenedNotLinkedToYouTrackIssue dpr -> undefined
   PullRequestMerged dpr -> undefined
   PullRequestUnknownMergeability dpr -> undefined
@@ -171,6 +171,6 @@ processRepos auth repoOwner' repos' = do
   let openPullRequests = filter (\pr -> pullRequestState pr == "open") (concat $ rights pullRequests)
   openPullRequestsDetails <- sequence $ map (\pr -> pullRequest' (Just auth) repoOwner' (getPullRequestRepoName pr) (pullRequestId pr)) openPullRequests
   let orderedOpenPullRequestsDetails = L.sortBy (compare `F.on` (\pr -> detailedPullRequestCreatedAt pr)) (rights openPullRequestsDetails)
-  let typedPullRequests = map (\pr -> getPullRequestType pr) orderedOpenPullRequestsDetails
+  typedPullRequests <- sequence $  map (\pr -> getPullRequestType pr) orderedOpenPullRequestsDetails
   results <- sequence $ map (\pr -> processPullRequestType auth pr) typedPullRequests
   return results

@@ -11,7 +11,6 @@ import Github.Auth
 import PullRequest.Utils
 import System.Environment
 import Control.Monad.IO.Class (liftIO)
-import Safe
 
 main :: IO ()
 main = do
@@ -44,15 +43,13 @@ main = do
       let event = decode b :: Maybe PullRequestEvent
       case event of
         Just prEvent -> do
-          case getPullRequestTypeFromEvent prEvent of
-            Nothing -> S.json . T.pack $ "Not able to figure out the pull request type"
-            Just prType -> do
-              res <- liftIO $ processPullRequestType auth prType
-              case res of
-                Left err -> S.json . T.pack $ (case err of
-                                                  HTTPConnectionError e -> "Connection error: " ++ (show e)
-                                                  ParseError e -> "ParseError: " ++ e
-                                                  JsonError e -> "JsonError: " ++ e
-                                                  UserError e -> "UserError: " ++ e)
-                Right dpr -> S.json . T.pack . show $ detailedPullRequestNumber dpr
+          prType <- liftIO $ getPullRequestTypeFromEvent prEvent
+          res <- liftIO $ processPullRequestType auth prType
+          case res of
+            Left err -> S.json . T.pack $ (case err of
+                                              HTTPConnectionError e -> "Connection error: " ++ (show e)
+                                              ParseError e -> "ParseError: " ++ e
+                                              JsonError e -> "JsonError: " ++ e
+                                              UserError e -> "UserError: " ++ e)
+            Right dpr -> S.json . T.pack . show $ detailedPullRequestNumber dpr
         Nothing -> S.json . T.pack $ ""
