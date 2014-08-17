@@ -56,8 +56,8 @@ pullRequestIsMergeable pr =
 isTargettingOpenBranch :: DetailedPullRequest -> IO Bool
 isTargettingOpenBranch dpr = do
   now' <- now
-  return $ DT.targetsOpenBranch ref now'
-    where ref = T.pack . pullRequestCommitRef . detailedPullRequestBase $ dpr
+  return $ DT.targetsOpenBranch targetBranch now'
+    where targetBranch = T.pack . pullRequestCommitRef . detailedPullRequestBase $ dpr
     
 -- | Determine if the pull request is considered auto-mergeable by the bot
 pullRequestIsAutoMergeable :: DetailedPullRequest -> IO Bool

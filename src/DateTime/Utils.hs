@@ -13,12 +13,12 @@ getBranchDate :: T.Text -> Maybe UTCTime
 getBranchDate branchDate = parseTime defaultTimeLocale "%Y%m%d" (T.unpack branchDate) :: Maybe UTCTime
 
 targetsOpenBranch :: T.Text -> UTCTime -> Bool
-targetsOpenBranch branchName rightNow =
+targetsOpenBranch targetBranch rightNow =
   case parsedDate of
     Just date' -> (diffUTCTime date' rightNow) > (fromInteger (138 * 60 * 60) :: NominalDiffTime)
     Nothing -> False
   where
-    parsedDate = lastMay $ T.splitOn (T.pack "_") branchName >>= \d ->
+    parsedDate = lastMay $ T.splitOn (T.pack "_") targetBranch >>= \d ->
       case getBranchDate d of
         Just branchDate' -> [branchDate']
         Nothing -> []
