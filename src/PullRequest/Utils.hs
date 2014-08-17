@@ -1,5 +1,6 @@
 module PullRequest.Utils where
 
+import Network.HTTP.Types.Status
 import Github.Data
 import Github.Repos.Webhooks
 import Github.Auth
@@ -49,10 +50,14 @@ pullRequestIsMergeable pr =
     Just mergeable -> mergeable
     Nothing -> False
 
+-- | Targets open branch
+targetsOpenBranch :: DetailedPullRequest -> Bool
+targetsOpenBranch dpr = True
+    
 -- | Determine if the pull request is considered auto-mergeable by the bot
 pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool
 pullRequestIsAutoMergeable pr =
-  ((not . detailedPullRequestMerged) $ pr) && (pullRequestIsMergeable pr) && (detailedPullRequestState pr) == "clean"
+  (not . detailedPullRequestMerged $ pr) && (pullRequestIsMergeable pr) && (detailedPullRequestState pr) == "clean"
 
 pullRequestIsOpen :: DetailedPullRequest -> Bool
 pullRequestIsOpen dpr = state == "open" || state == "reopen"
@@ -62,7 +67,7 @@ pullRequestIsReopened :: DetailedPullRequest -> IO Bool
 pullRequestIsReopened dpr = do
   events <- eventsForIssue owner' repo' issueNumber'
   case events of
-    Left err -> return False
+    Left _ -> return False
     Right events' -> do
       let lastEvent = lastMay events'
       case lastEvent of
@@ -82,7 +87,9 @@ getPullRequestType dpr = do
     isReopened <- pullRequestIsReopened dpr
     if isReopened && (pullRequestIsOpen dpr)
       then return $ PullRequestReopenedNotLinkedToYouTrackTicket dpr
-      else return $ PullRequestIsUncategorized dpr
+      else if pullRequestIsAutoMergeable dpr
+           then return $ PullRequestAutoMergeable dpr
+           else return $ PullRequestIsUncategorized dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
 getPullRequestTypeFromEvent :: PullRequestEvent -> IO MindTouchPullRequestType
@@ -106,7 +113,11 @@ processPullRequestType auth prType = case prType of
   PullRequestOpenedNotLinkedToYouTrackIssue dpr -> undefined
   PullRequestMerged dpr -> undefined
   PullRequestUnknownMergeability dpr -> undefined
-  PullRequestAutoMergeable dpr -> undefined
+  PullRequestAutoMergeable dpr -> do
+    mergeRes <- internalMergePullRequest auth dpr
+    case mergeRes of
+      Left err -> return $ Left err
+      Right dpr' -> return $ Right dpr
 
 -- | How to 'createWebhooks'
 createWebhooks :: GithubAuth -> RepoOwner -> [T.Text] -> T.Text -> IO [(Either Error RepoWebhook)]
@@ -129,10 +140,21 @@ webhookExists auth repoOwner' repoName' publicUri = do
     (Left _) -> return (repoName', False)
     (Right webhooks) -> return $ (repoName', (any (\wh -> publicUri == T.pack (repoWebhookUrl wh)) webhooks))
 
+-- | Merge pull request
+internalMergePullRequest :: GithubAuth -> DetailedPullRequest -> IO (Either Error Status)
+internalMergePullRequest auth dpr = mergePullRequest auth repoOwner' repoName' prNumber (Just "Valid pull request")
+  where repoOwner' = getOwner dpr
+        repoName' = getRepoName dpr
+        prNumber = detailedPullRequestNumber dpr
+
 -- | Close a pull request
 closePullRequest :: GithubAuth -> DetailedPullRequest -> IO (Either Error DetailedPullRequest)
-closePullRequest auth dpr =
-  updatePullRequest auth repoOwner' repoName' prNumber EditPullRequest { editPullRequestTitle = Nothing, editPullRequestBody = Nothing, editPullRequestState = Just EditPullRequestStateClosed }
+closePullRequest auth dpr = internalUpdatePullRequest auth dpr EditPullRequest { editPullRequestTitle = Nothing, editPullRequestBody = Nothing, editPullRequestState = Just EditPullRequestStateClosed }
+
+-- | Update a pull request
+internalUpdatePullRequest :: GithubAuth -> DetailedPullRequest -> EditPullRequest -> IO (Either Error DetailedPullRequest)    
+internalUpdatePullRequest auth dpr =
+  updatePullRequest auth repoOwner' repoName' prNumber
   where repoOwner' = getOwner dpr
         repoName' = getRepoName dpr
         prNumber = detailedPullRequestNumber dpr
