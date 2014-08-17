@@ -10,6 +10,7 @@ import Github.Issues.Events
 import Data.Functor
 import Control.Monad
 import Data.Either
+import Datetime.Utils
 import Safe
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -51,8 +52,11 @@ pullRequestIsMergeable pr =
     Nothing -> False
 
 -- | Targets open branch
-targetsOpenBranch :: DetailedPullRequest -> Bool
-targetsOpenBranch dpr = True
+targetsOpenBranch :: DetailedPullRequest -> IO Bool
+targetsOpenBranch dpr = do
+  now' <- now
+  return $ targetsOpenBranch ref now'
+    where ref = pullRequestCommitRef . detailedPullRequestBase $ dpr
     
 -- | Determine if the pull request is considered auto-mergeable by the bot
 pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool

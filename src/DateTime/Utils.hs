@@ -1,12 +1,24 @@
 module Datetime.Utils where 
 
-import Date.Time.Format
-import Date.Time.Clock
-import Date.Time.LocalTime
+import Data.Time.Format
+import Data.Time.Clock
+import Data.Time.LocalTime
 import System.Locale
+import qualified Data.Text as T
+import Safe
 
 now :: IO UTCTime
-now :: getCurrentTime
+now = getCurrentTime
 
-getBranchDate :: String -> Maybe UTCTime
-getBranchDate branchName = parseTime defaultTimeLocale "%Y%m%d" branchName :: Maybe UTCTime
+getBranchDate :: T.Text -> Maybe UTCTime
+getBranchDate branchDate = parseTime defaultTimeLocale "%Y%m%d" (T.unpack branchDate) :: Maybe UTCTime
+
+targetsOpenBranch :: T.Text -> UTCTime -> IO Bool
+targetsOpenBranch branchName rightNow =
+  case parsedDate of
+    Just date' -> return $ (diffUTCTime date' rightNow) > secondsToDiffTime (138 * 60 * 60)
+    Nothing -> return $ False
+  where
+    parsedDate = lastMay $ T.splitOn (T.pack "_") branchName >>= \d -> getBranchDate d
+
+  
