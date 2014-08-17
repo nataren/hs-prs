@@ -18,8 +18,9 @@ targetsOpenBranch targetBranch rightNow =
     Just date' -> (diffUTCTime date' rightNow) > (fromInteger (138 * 60 * 60) :: NominalDiffTime)
     Nothing -> False
   where
-    parsedDate = lastMay $ T.splitOn (T.pack "_") targetBranch >>= \d ->
-      case getBranchDate d of
-        Just branchDate' -> [branchDate']
-        Nothing -> []
+    parsedDate = do
+      targetDate <- lastMay $ T.splitOn (T.pack "_") targetBranch
+      case getBranchDate targetDate of
+        Just targetDate' -> Just targetDate'
+        Nothing -> Nothing
   
