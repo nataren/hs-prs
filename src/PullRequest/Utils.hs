@@ -53,16 +53,18 @@ pullRequestIsMergeable pr =
     Nothing -> False
 
 -- | Targets open branch
-targetsOpenBranch :: DetailedPullRequest -> IO Bool
-targetsOpenBranch dpr = do
+isTargettingOpenBranch :: DetailedPullRequest -> IO Bool
+isTargettingOpenBranch dpr = do
   now' <- now
   return $ DT.targetsOpenBranch ref now'
     where ref = T.pack . pullRequestCommitRef . detailedPullRequestBase $ dpr
     
 -- | Determine if the pull request is considered auto-mergeable by the bot
-pullRequestIsAutoMergeable :: DetailedPullRequest -> Bool
-pullRequestIsAutoMergeable pr =
-  (not . detailedPullRequestMerged $ pr) && (pullRequestIsMergeable pr) && (detailedPullRequestState pr) == "clean"
+pullRequestIsAutoMergeable :: DetailedPullRequest -> IO Bool
+pullRequestIsAutoMergeable pr = do
+  targetsOpenBranch' <- isTargettingOpenBranch pr
+  return $ targetsOpenBranch' && (not . detailedPullRequestMerged $ pr) && (pullRequestIsMergeable pr) && (detailedPullRequestState pr) == "clean"
+
 
 pullRequestIsOpen :: DetailedPullRequest -> Bool
 pullRequestIsOpen dpr = state == "open" || state == "reopen"
@@ -92,9 +94,11 @@ getPullRequestType dpr = do
     isReopened <- pullRequestIsReopened dpr
     if isReopened && (pullRequestIsOpen dpr)
       then return $ PullRequestReopenedNotLinkedToYouTrackTicket dpr
-      else if pullRequestIsAutoMergeable dpr
-           then return $ PullRequestAutoMergeable dpr
-           else return $ PullRequestIsUncategorized dpr
+      else do
+           isAutoMergeable <- pullRequestIsAutoMergeable dpr
+           if isAutoMergeable
+             then return $ PullRequestAutoMergeable dpr
+             else return $ PullRequestIsUncategorized dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
 getPullRequestTypeFromEvent :: PullRequestEvent -> IO MindTouchPullRequestType
