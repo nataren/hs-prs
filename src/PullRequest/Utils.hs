@@ -98,6 +98,7 @@ getPullRequestType dpr = do
            isAutoMergeable <- pullRequestIsAutoMergeable dpr
            if isAutoMergeable
              then return $ PullRequestAutoMergeable dpr
+             -- xxx (pullRequestCommitRef . detailedPullRequestHead $ dpr)
              else return $ PullRequestIsUncategorized dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is

@@ -52,7 +52,8 @@ executable hs-prs
   -- exposed-modules:     
   
   -- Modules included in this library but not exported.
-  other-modules: PullRequest.Utils
+  other-modules: PullRequest.Utils,
+                 TicketingSystem.Utils
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
