@@ -17,6 +17,7 @@ import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Function as F
 import qualified Datetime.Utils as DT
+import qualified TicketingSystem.Utils as TS
 
 -- | The 'MindTouchPullRequestType' represents the different ways we
 -- classify a pull request
@@ -91,15 +92,18 @@ getPullRequestType dpr = do
   if prTargetsMasterBranch
     then return $ PullRequestTargetsMasterBranch dpr
     else do
-    isReopened <- pullRequestIsReopened dpr
-    if isReopened && (pullRequestIsOpen dpr)
-      then return $ PullRequestReopenedNotLinkedToYouTrackTicket dpr
-      else do
-           isAutoMergeable <- pullRequestIsAutoMergeable dpr
-           if isAutoMergeable
-             then return $ PullRequestAutoMergeable dpr
-             -- xxx (pullRequestCommitRef . detailedPullRequestHead $ dpr)
-             else return $ PullRequestIsUncategorized dpr
+    prIsAssociatedToTicket <- TS.isPullRequestAssociatedToTicket (T.pack . pullRequestCommitRef . detailedPullRequestHead $ dpr)
+    if not prIsAssociatedToTicket
+      then return $ PullRequestOpenedNotLinkedToYouTrackIssue dpr
+      else do    
+      isReopened <- pullRequestIsReopened dpr
+      if isReopened && (pullRequestIsOpen dpr)
+        then return $ PullRequestReopenedNotLinkedToYouTrackTicket dpr
+        else do
+        isAutoMergeable <- pullRequestIsAutoMergeable dpr
+        if isAutoMergeable
+          then return $ PullRequestAutoMergeable dpr
+          else return $ PullRequestIsUncategorized dpr
 
 -- | Given a 'PullRequestEvent' find out which pull request type is
 getPullRequestTypeFromEvent :: PullRequestEvent -> IO MindTouchPullRequestType
