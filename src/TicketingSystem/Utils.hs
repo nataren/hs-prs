@@ -2,8 +2,10 @@
 module TicketingSystem.Utils (
   isPullRequestAssociatedToTicket
 ) where
+import Control.Monad.Trans.Reader
 import qualified Data.Text as T
 import qualified YouTrack as YT
+import Control.Monad.IO.Class
 
 getPullRequestTicketNames :: T.Text -> [T.Text]
 getPullRequestTicketNames prRef =
@@ -13,10 +15,11 @@ getPullRequestTicketNames prRef =
     syntacticallyValidTicketNames =
       filter (\ticketName -> (T.pack "-") `T.isInfixOf` ticketName)
 
-isPullRequestAssociatedToTicket :: T.Text -> IO Bool
+isPullRequestAssociatedToTicket :: T.Text -> ReaderT YT.YouTrackAuth IO Bool
 isPullRequestAssociatedToTicket prRef = do
   let ticketNames = getPullRequestTicketNames prRef
-  ticketingAuth <- YT.mkYouTrackAuth "hostname" "username" "password"
-  issues <- sequence $ map (\ticketName -> YT.issueExists ticketingAuth (T.unpack ticketName)) ticketNames
-  return $ any id issues
+  ticketingAuth <- ask
+  liftIO $ do
+    issues <- sequence $ map (\ticketName -> runReaderT (YT.issueExists (T.unpack ticketName))  ticketingAuth) ticketNames
+    return $ any id issues
 
